@@ -70,18 +70,18 @@ async function main() {
       await runCommand('baml-cli', ['generate'], 'Generating BAML files');
     } else if (packageManager === 'poetry') {
       // Initialize poetry project if pyproject.toml doesn't exist
-      if (!existsSync('pyproject.toml' && 'poetry.lock')) {
+      if (!existsSync('pyproject.toml')) {
         console.log(chalk.yellow('\nInitializing new Python project with Poetry...'));
-        await runCommand('poetry', ['init', '--name=baml-project', '--description="A BAML project"', '--author=""', '--python="^3.8"', '--dependency=baml-py', '--no-interaction'], 'Creating Poetry project');
+        await runCommand('poetry', ['init', '--name=baml-project', '--description=A BAML project', '--author=', '--python=^3.8', '--no-interaction'], 'Creating Poetry project');
       }
       await runCommand('poetry', ['add', 'baml-py'], 'Adding baml-py');
       await runCommand('poetry', ['run', 'baml-cli', 'init'], 'Initializing BAML');
       await runCommand('poetry', ['run', 'baml-cli', 'generate'], 'Generating BAML files');
     } else if (packageManager === 'uv') {
-      // Initialize requirements.txt if it doesn't exist (uv uses requirements.txt)
-      if (!existsSync('pyproject.toml' && 'uv.lock')) {
+      // Initialize pyproject.toml properly with uv init if it doesn't exist
+      if (!existsSync('pyproject.toml')) {
         console.log(chalk.yellow('\nInitializing new Python project with uv...'));
-        await runCommand('touch', ['pyproject.toml'], 'Creating pyproject.toml');
+        await runCommand('uv', ['init'], 'Initializing uv project');
       }
       await runCommand('uv', ['add', 'baml-py'], 'Adding baml-py');
       await runCommand('uv', ['run', 'baml-cli', 'init'], 'Initializing BAML');

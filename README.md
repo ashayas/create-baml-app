@@ -1,4 +1,4 @@
-# Create BAML App 🦙
+# Create BAML App 🐑
 
 <p align="center">
 <img src="https://github.com/ashayas/create-baml-app/raw/master/.github/assets/lamb.png" width="250" alt="Create BAML App"/>

@@ -65,7 +65,14 @@ async function main() {
         console.log(chalk.yellow('\nInitializing new Python project with pip...'));
         await runCommand('touch', ['requirements.txt'], 'Creating requirements.txt');
       }
-      await runCommand('pip', ['install', 'baml-py'], 'Installing baml-py');
+      try {
+        await runCommand('pip', ['install', 'baml-py'], 'Installing baml-py');
+      } catch (error) {
+        console.log(chalk.red('\nError: pip is not installed or not available in PATH'));
+        console.log(chalk.yellow('Please install pip first:'));
+        console.log(chalk.gray('https://pip.pypa.io/en/stable/installation/\n'));
+        process.exit(1);
+      }
       await runCommand('baml-cli', ['init'], 'Initializing BAML');
       await runCommand('baml-cli', ['generate'], 'Generating BAML files');
     } else if (packageManager === 'poetry') {

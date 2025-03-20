@@ -27,16 +27,34 @@ BAML lets you define schema classes and functions that can be called from your p
 
 ## Installation & Usage 🚀
 
-You can create a new BAML project using npx without installing anything:
+Create a new BAML project using npx:
 
 ```bash
+# Create a new project with interactive prompts
 npx create-baml-app
+
+# Create a new project in a specific directory
+npx create-baml-app my-baml-app
+
+# Create a new project in the current directory
+npx create-baml-app my-baml-app --use-current-dir
+# or
+npx create-baml-app my-baml-app -.
+
+# Show help menu
+npx create-baml-app --help
 ```
 
-This interactive CLI will:
-1. Help you select a programming language (Python, TypeScript, Ruby)
-2. Choose your preferred package manager
-3. Set up a complete BAML project structure
+When using the interactive prompts:
+- Enter your project name (defaults to 'my-app')
+- Use "." to create the project in the current directory
+- Or enter a name to create a new directory
+
+The CLI will then:
+1. Create a new directory for your project (unless "." or --use-current-dir is specified)
+2. Help you select a programming language (Python, TypeScript, Ruby)
+3. Choose your preferred package manager
+4. Set up a complete BAML project structure
 
 ## Supported Languages and Package Managers 🛠️
 

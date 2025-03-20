@@ -3,8 +3,23 @@
 import inquirer from 'inquirer';
 import chalk from 'chalk';
 import { execa } from 'execa';
-import { existsSync } from 'fs';
-import { join } from 'path';
+import { existsSync, mkdirSync } from 'fs';
+import { join, resolve } from 'path';
+import fs from 'fs';
+
+function showHelp() {
+  console.log(chalk.bold.magenta('\nCreate BAML App 🦙'));
+  console.log('\nUsage:');
+  console.log('  npx create-baml-app [project-name] [options]');
+  console.log('\nOptions:');
+  console.log('  -h, --help              Show this help message');
+  console.log('  --use-current-dir, -.   Use current directory instead of creating a new one');
+  console.log('\nExamples:');
+  console.log('  npx create-baml-app my-baml-app');
+  console.log('  npx create-baml-app my-baml-app --use-current-dir');
+  console.log('  npx create-baml-app my-baml-app -.');
+  process.exit(0);
+}
 
 async function runCommand(command, args, description) {
   console.log(chalk.cyan(`\nRunning: ${description}...`));
@@ -20,7 +35,71 @@ async function runCommand(command, args, description) {
 
 async function main() {
   console.log(chalk.bold.magenta('\nWelcome to create-baml-app! 🦙'));
-  console.log(chalk.yellow("Let's set up your BAML project...\n"));
+  
+  // Handle command line arguments
+  const args = process.argv.slice(2);
+  
+  // Show help if requested
+  if (args.includes('-h') || args.includes('--help')) {
+    showHelp();
+  }
+
+  // Get project name from arguments or prompt
+  let projectName = args[0];
+  if (!projectName) {
+    const response = await inquirer.prompt([
+      {
+        type: 'input',
+        name: 'projectName',
+        message: 'What is your project named? (Use "." to create in current directory)',
+        default: 'my-app',
+        validate: (input) => {
+          if (input === '.') return true;
+          if (!/^[a-zA-Z0-9-_]+$/.test(input)) {
+            return 'Project name can only contain letters, numbers, dashes and underscores';
+          }
+          return true;
+        }
+      }
+    ]);
+    projectName = response.projectName;
+  }
+
+  // Determine target directory
+  const useCurrentDir = projectName === '.' || args.includes('--use-current-dir') || args.includes('-.');
+  const targetDir = useCurrentDir ? process.cwd() : resolve(projectName);
+  
+  // Check if directory is empty if using current directory
+  if (useCurrentDir && existsSync(targetDir) && fs.readdirSync(targetDir).length > 0) {
+    console.error(chalk.red('\nError: Current directory is not empty. Please use a new directory or empty the current one.'));
+    process.exit(1);
+  }
+
+  // Create directory if not using current directory
+  if (!useCurrentDir) {
+    if (existsSync(targetDir)) {
+      console.error(chalk.red(`\nError: Directory ${projectName} already exists. Please choose a different name or use --use-current-dir to use an existing directory.`));
+      process.exit(1);
+    }
+    
+    console.log(chalk.cyan(`\nCreating a new BAML app in ${chalk.green(targetDir)}`));
+    try {
+      mkdirSync(targetDir, { recursive: true });
+    } catch (error) {
+      console.error(chalk.red(`Error creating directory: ${error.message}`));
+      process.exit(1);
+    }
+  }
+
+  // Change to target directory
+  try {
+    process.chdir(targetDir);
+  } catch (error) {
+    console.error(chalk.red(`Error changing to directory: ${error.message}`));
+    process.exit(1);
+  }
+
+  console.log(chalk.yellow("\nLet's set up your BAML project...\n"));
 
   // Step 1: Select Language
   const { language } = await inquirer.prompt([

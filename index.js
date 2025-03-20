@@ -188,14 +188,71 @@ async function main() {
       await runCommand('uv', ['run', 'baml-cli', 'generate'], 'Generating BAML files');
     }
   } else if (language === 'TypeScript') {
+    // Install TypeScript first based on package manager (except for Deno)
+    if (packageManager !== 'deno') {
+      try {
+        switch (packageManager) {
+          case 'npm':
+            await runCommand('npm', ['install', 'typescript', '--save-dev'], 'Installing TypeScript');
+            break;
+          case 'pnpm':
+            await runCommand('pnpm', ['add', 'typescript', '-D'], 'Installing TypeScript');
+            break;
+          case 'yarn':
+            await runCommand('yarn', ['add', 'typescript', '--dev'], 'Installing TypeScript');
+            break;
+        }
+      } catch (error) {
+        console.log(chalk.red(`\nError: Failed to install TypeScript with ${packageManager}`));
+        console.log(chalk.yellow(`Please install ${packageManager} first:`));
+        switch (packageManager) {
+          case 'npm':
+            console.log(chalk.gray('https://docs.npmjs.com/downloading-and-installing-node-js-and-npm\n'));
+            break;
+          case 'pnpm':
+            console.log(chalk.gray('https://pnpm.io/installation\n'));
+            break;
+          case 'yarn':
+            console.log(chalk.gray('https://classic.yarnpkg.com/en/docs/install\n'));
+            break;
+        }
+        process.exit(1);
+      }
+    }
+
     // Create tsconfig.json if it doesn't exist
     if (!existsSync('tsconfig.json')) {
       try {
-        await runCommand('npx', ['tsc', '--init'], 'Creating tsconfig.json');
+        switch (packageManager) {
+          case 'npm':
+            await runCommand('npx', ['tsc', '--init'], 'Creating tsconfig.json');
+            break;
+          case 'pnpm':
+            await runCommand('pnpm', ['exec', 'tsc', '--init'], 'Creating tsconfig.json');
+            break;
+          case 'yarn':
+            await runCommand('yarn', ['tsc', '--init'], 'Creating tsconfig.json');
+            break;
+          case 'deno':
+            // For Deno, we'll create a basic tsconfig.json directly
+            console.log(chalk.cyan('\nCreating tsconfig.json for Deno...'));
+            const denoConfig = {
+              "compilerOptions": {
+                "target": "ES2022",
+                "lib": ["ES2022", "DOM"],
+                "module": "ES2022",
+                "moduleResolution": "node",
+                "esModuleInterop": true,
+                "strict": true,
+                "skipLibCheck": true
+              }
+            };
+            fs.writeFileSync('tsconfig.json', JSON.stringify(denoConfig, null, 2));
+            console.log(chalk.green('✓ Success!'));
+            break;
+        }
       } catch (error) {
-        console.log(chalk.red('\nError: Node.js/npm is not installed or not available in PATH'));
-        console.log(chalk.yellow('Please install Node.js first:'));
-        console.log(chalk.gray('https://nodejs.org/\n'));
+        console.error(chalk.red(`Error creating tsconfig.json: ${error.message}`));
         process.exit(1);
       }
     }

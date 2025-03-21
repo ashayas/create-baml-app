@@ -28,7 +28,11 @@ async function runCommand(command, args, description) {
     console.log(chalk.green('✓ Success!'));
     return stdout;
   } catch (error) {
-    console.error(chalk.red(`Error: ${error.message}`));
+    if (error.code === 'ENOENT') {
+      console.error(chalk.red(`Error: Command '${command}' not found. Please make sure it is installed and available in your PATH.`));
+    } else {
+      console.error(chalk.red(`Error: ${error.message}`));
+    }
     process.exit(1);
   }
 }
@@ -144,14 +148,19 @@ async function main() {
         console.log(chalk.yellow('\nInitializing new Python project with pip...'));
         await runCommand('touch', ['requirements.txt'], 'Creating requirements.txt');
       }
+      
+      // Check if pip is installed first
       try {
-        await runCommand('pip', ['install', 'baml-py'], 'Installing baml-py');
+        await runCommand('pip', ['--version'], 'Checking pip installation');
       } catch (error) {
         console.log(chalk.red('\nError: pip is not installed or not available in PATH'));
         console.log(chalk.yellow('Please install pip first:'));
         console.log(chalk.gray('https://pip.pypa.io/en/stable/installation/\n'));
         process.exit(1);
       }
+      
+      // Continue with the rest of the installation
+      await runCommand('pip', ['install', 'baml-py'], 'Installing baml-py');
       await runCommand('baml-cli', ['init'], 'Initializing BAML');
       await runCommand('baml-cli', ['generate'], 'Generating BAML files');
     } else if (packageManager === 'poetry') {
@@ -159,6 +168,7 @@ async function main() {
       if (!existsSync('pyproject.toml')) {
         console.log(chalk.yellow('\nInitializing new Python project with Poetry...'));
         try {
+          await runCommand('poetry', ['--version'], 'Checking Poetry installation');
           await runCommand('poetry', ['init', '--name=baml-project', '--description=A BAML project', '--author=', '--python=^3.8', '--no-interaction'], 'Creating Poetry project');
         } catch (error) {
           console.log(chalk.red('\nError: Poetry is not installed or not available in PATH'));
@@ -175,6 +185,7 @@ async function main() {
       if (!existsSync('pyproject.toml')) {
         console.log(chalk.yellow('\nInitializing new Python project with uv...'));
         try {
+          await runCommand('uv', ['--version'], 'Checking uv installation');
           await runCommand('uv', ['init'], 'Initializing uv project');
         } catch (error) {
           console.log(chalk.red('\nError: uv is not installed or not available in PATH'));
@@ -280,7 +291,7 @@ async function main() {
       }
       await runCommand('pnpm', ['add', '@boundaryml/baml'], 'Adding @boundaryml/baml');
       await runCommand('pnpm', ['exec', 'baml-cli', 'init'], 'Initializing BAML');
-      await runCommand('npx', ['baml-cli', 'generate'], 'Generating BAML files');
+      await runCommand('pnpm', ['exec', 'baml-cli', 'generate'], 'Generating BAML files');
     } else if (packageManager === 'yarn') {
       try {
         await runCommand('yarn', ['--version'], 'Checking yarn installation');
@@ -292,7 +303,7 @@ async function main() {
       }
       await runCommand('yarn', ['add', '@boundaryml/baml'], 'Adding @boundaryml/baml');
       await runCommand('yarn', ['baml-cli', 'init'], 'Initializing BAML');
-      await runCommand('npx', ['baml-cli', 'generate'], 'Generating BAML files');
+      await runCommand('yarn', ['baml-cli', 'generate'], 'Generating BAML files');
     } else if (packageManager === 'deno') {
       try {
         await runCommand('deno', ['--version'], 'Checking deno installation');

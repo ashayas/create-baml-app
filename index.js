@@ -37,6 +37,16 @@ async function runCommand(command, args, description) {
   }
 }
 
+// Check if a command is available without exiting if not
+async function checkCommandAvailable(command) {
+  try {
+    await execa(command, ['--version'], { stdio: 'ignore' });
+    return true;
+  } catch (error) {
+    return false;
+  }
+}
+
 async function main() {
   console.log(chalk.bold.magenta('\nWelcome to create-baml-app! 🦙'));
   
@@ -72,36 +82,6 @@ async function main() {
   // Determine target directory
   const useCurrentDir = projectName === '.' || args.includes('--use-current-dir') || args.includes('-.');
   const targetDir = useCurrentDir ? process.cwd() : resolve(projectName);
-  
-  // Check if directory is empty if using current directory
-  if (useCurrentDir && existsSync(targetDir) && fs.readdirSync(targetDir).length > 0) {
-    console.error(chalk.red('\nError: Current directory is not empty. Please use a new directory or empty the current one.'));
-    process.exit(1);
-  }
-
-  // Create directory if not using current directory
-  if (!useCurrentDir) {
-    if (existsSync(targetDir)) {
-      console.error(chalk.red(`\nError: Directory ${projectName} already exists. Please choose a different name or use --use-current-dir to use an existing directory.`));
-      process.exit(1);
-    }
-    
-    console.log(chalk.cyan(`\nCreating a new BAML app in ${chalk.green(targetDir)}`));
-    try {
-      mkdirSync(targetDir, { recursive: true });
-    } catch (error) {
-      console.error(chalk.red(`Error creating directory: ${error.message}`));
-      process.exit(1);
-    }
-  }
-
-  // Change to target directory
-  try {
-    process.chdir(targetDir);
-  } catch (error) {
-    console.error(chalk.red(`Error changing to directory: ${error.message}`));
-    process.exit(1);
-  }
 
   console.log(chalk.yellow("\nLet's set up your BAML project...\n"));
 
@@ -138,6 +118,80 @@ async function main() {
     },
   ]);
 
+  // Check if the package manager is available before creating directories
+  let isPackageManagerAvailable = await checkCommandAvailable(packageManager);
+  
+  // For npm/pnpm/yarn, we might need to check node instead
+  if (!isPackageManagerAvailable && ['npm', 'pnpm', 'yarn'].includes(packageManager)) {
+    isPackageManagerAvailable = await checkCommandAvailable('node');
+  }
+  
+  if (!isPackageManagerAvailable) {
+    console.log(chalk.red(`\nError: ${packageManager} is not installed or not available in PATH`));
+    console.log(chalk.yellow(`Please install ${packageManager} first.`));
+    
+    let installLink = '';
+    switch (packageManager) {
+      case 'pip':
+        installLink = 'https://pip.pypa.io/en/stable/installation/';
+        break;
+      case 'poetry':
+        installLink = 'https://python-poetry.org/docs/#installation';
+        break;
+      case 'uv':
+        installLink = 'https://github.com/astral-sh/uv#installation';
+        break;
+      case 'npm':
+        installLink = 'https://docs.npmjs.com/downloading-and-installing-node-js-and-npm';
+        break;
+      case 'pnpm':
+        installLink = 'https://pnpm.io/installation';
+        break;
+      case 'yarn':
+        installLink = 'https://classic.yarnpkg.com/en/docs/install';
+        break;
+      case 'deno':
+        installLink = 'https://deno.land/#installation';
+        break;
+      case 'bundle':
+        installLink = 'https://bundler.io/#getting-started';
+        break;
+    }
+    
+    console.log(chalk.gray(`${installLink}\n`));
+    process.exit(1);
+  }
+  
+  // Only check if directory is empty if using current directory
+  if (useCurrentDir && existsSync(targetDir) && fs.readdirSync(targetDir).length > 0) {
+    console.error(chalk.red('\nError: Current directory is not empty. Please use a new directory or empty the current one.'));
+    process.exit(1);
+  }
+
+  // Create directory if not using current directory
+  if (!useCurrentDir) {
+    if (existsSync(targetDir)) {
+      console.error(chalk.red(`\nError: Directory ${projectName} already exists. Please choose a different name or use --use-current-dir to use an existing directory.`));
+      process.exit(1);
+    }
+    
+    console.log(chalk.cyan(`\nCreating a new BAML app in ${chalk.green(targetDir)}`));
+    try {
+      mkdirSync(targetDir, { recursive: true });
+    } catch (error) {
+      console.error(chalk.red(`Error creating directory: ${error.message}`));
+      process.exit(1);
+    }
+  }
+
+  // Change to target directory
+  try {
+    process.chdir(targetDir);
+  } catch (error) {
+    console.error(chalk.red(`Error changing to directory: ${error.message}`));
+    process.exit(1);
+  }
+
   // Step 3: Execute Commands
   console.log(chalk.magenta(`\nSetting up your ${language} BAML project with ${packageManager}...\n`));
 
@@ -149,16 +203,6 @@ async function main() {
         await runCommand('touch', ['requirements.txt'], 'Creating requirements.txt');
       }
       
-      // Check if pip is installed first
-      try {
-        await runCommand('pip', ['--version'], 'Checking pip installation');
-      } catch (error) {
-        console.log(chalk.red('\nError: pip is not installed or not available in PATH'));
-        console.log(chalk.yellow('Please install pip first:'));
-        console.log(chalk.gray('https://pip.pypa.io/en/stable/installation/\n'));
-        process.exit(1);
-      }
-      
       // Continue with the rest of the installation
       await runCommand('pip', ['install', 'baml-py'], 'Installing baml-py');
       await runCommand('baml-cli', ['init'], 'Initializing BAML');
@@ -167,15 +211,7 @@ async function main() {
       // Initialize poetry project if pyproject.toml doesn't exist
       if (!existsSync('pyproject.toml')) {
         console.log(chalk.yellow('\nInitializing new Python project with Poetry...'));
-        try {
-          await runCommand('poetry', ['--version'], 'Checking Poetry installation');
-          await runCommand('poetry', ['init', '--name=baml-project', '--description=A BAML project', '--author=', '--python=^3.8', '--no-interaction'], 'Creating Poetry project');
-        } catch (error) {
-          console.log(chalk.red('\nError: Poetry is not installed or not available in PATH'));
-          console.log(chalk.yellow('Please install Poetry first:'));
-          console.log(chalk.gray('https://python-poetry.org/docs/#installation\n'));
-          process.exit(1);
-        }
+        await runCommand('poetry', ['init', '--name=baml-project', '--description=A BAML project', '--author=', '--python=^3.8', '--no-interaction'], 'Creating Poetry project');
       }
       await runCommand('poetry', ['add', 'baml-py'], 'Adding baml-py');
       await runCommand('poetry', ['run', 'baml-cli', 'init'], 'Initializing BAML');
@@ -184,15 +220,7 @@ async function main() {
       // Initialize pyproject.toml properly with uv init if it doesn't exist
       if (!existsSync('pyproject.toml')) {
         console.log(chalk.yellow('\nInitializing new Python project with uv...'));
-        try {
-          await runCommand('uv', ['--version'], 'Checking uv installation');
-          await runCommand('uv', ['init'], 'Initializing uv project');
-        } catch (error) {
-          console.log(chalk.red('\nError: uv is not installed or not available in PATH'));
-          console.log(chalk.yellow('Please install uv first:'));
-          console.log(chalk.gray('https://github.com/astral-sh/uv#installation\n'));
-          process.exit(1);
-        }
+        await runCommand('uv', ['init'], 'Initializing uv project');
       }
       await runCommand('uv', ['add', 'baml-py'], 'Adding baml-py');
       await runCommand('uv', ['run', 'baml-cli', 'init'], 'Initializing BAML');
@@ -201,33 +229,16 @@ async function main() {
   } else if (language === 'TypeScript') {
     // Install TypeScript first based on package manager (except for Deno)
     if (packageManager !== 'deno') {
-      try {
-        switch (packageManager) {
-          case 'npm':
-            await runCommand('npm', ['install', 'typescript', '--save-dev'], 'Installing TypeScript');
-            break;
-          case 'pnpm':
-            await runCommand('pnpm', ['add', 'typescript', '-D'], 'Installing TypeScript');
-            break;
-          case 'yarn':
-            await runCommand('yarn', ['add', 'typescript', '--dev'], 'Installing TypeScript');
-            break;
-        }
-      } catch (error) {
-        console.log(chalk.red(`\nError: Failed to install TypeScript with ${packageManager}`));
-        console.log(chalk.yellow(`Please install ${packageManager} first:`));
-        switch (packageManager) {
-          case 'npm':
-            console.log(chalk.gray('https://docs.npmjs.com/downloading-and-installing-node-js-and-npm\n'));
-            break;
-          case 'pnpm':
-            console.log(chalk.gray('https://pnpm.io/installation\n'));
-            break;
-          case 'yarn':
-            console.log(chalk.gray('https://classic.yarnpkg.com/en/docs/install\n'));
-            break;
-        }
-        process.exit(1);
+      switch (packageManager) {
+        case 'npm':
+          await runCommand('npm', ['install', 'typescript', '--save-dev'], 'Installing TypeScript');
+          break;
+        case 'pnpm':
+          await runCommand('pnpm', ['add', 'typescript', '-D'], 'Installing TypeScript');
+          break;
+        case 'yarn':
+          await runCommand('yarn', ['add', 'typescript', '--dev'], 'Installing TypeScript');
+          break;
       }
     }
 
@@ -269,50 +280,18 @@ async function main() {
     }
 
     if (packageManager === 'npm') {
-      try {
-        await runCommand('npm', ['--version'], 'Checking npm installation');
-      } catch (error) {
-        console.log(chalk.red('\nError: npm is not installed or not available in PATH'));
-        console.log(chalk.yellow('Please install npm first:'));
-        console.log(chalk.gray('https://docs.npmjs.com/downloading-and-installing-node-js-and-npm\n'));
-        process.exit(1);
-      }
       await runCommand('npm', ['install', '@boundaryml/baml'], 'Installing @boundaryml/baml');
       await runCommand('npx', ['baml-cli', 'init'], 'Initializing BAML');
       await runCommand('npx', ['baml-cli', 'generate'], 'Generating BAML files');
     } else if (packageManager === 'pnpm') {
-      try {
-        await runCommand('pnpm', ['--version'], 'Checking pnpm installation');
-      } catch (error) {
-        console.log(chalk.red('\nError: pnpm is not installed or not available in PATH'));
-        console.log(chalk.yellow('Please install pnpm first:'));
-        console.log(chalk.gray('https://pnpm.io/installation\n'));
-        process.exit(1);
-      }
       await runCommand('pnpm', ['add', '@boundaryml/baml'], 'Adding @boundaryml/baml');
       await runCommand('pnpm', ['exec', 'baml-cli', 'init'], 'Initializing BAML');
       await runCommand('pnpm', ['exec', 'baml-cli', 'generate'], 'Generating BAML files');
     } else if (packageManager === 'yarn') {
-      try {
-        await runCommand('yarn', ['--version'], 'Checking yarn installation');
-      } catch (error) {
-        console.log(chalk.red('\nError: yarn is not installed or not available in PATH'));
-        console.log(chalk.yellow('Please install yarn first:'));
-        console.log(chalk.gray('https://classic.yarnpkg.com/en/docs/install\n'));
-        process.exit(1);
-      }
       await runCommand('yarn', ['add', '@boundaryml/baml'], 'Adding @boundaryml/baml');
       await runCommand('yarn', ['baml-cli', 'init'], 'Initializing BAML');
       await runCommand('yarn', ['baml-cli', 'generate'], 'Generating BAML files');
     } else if (packageManager === 'deno') {
-      try {
-        await runCommand('deno', ['--version'], 'Checking deno installation');
-      } catch (error) {
-        console.log(chalk.red('\nError: deno is not installed or not available in PATH'));
-        console.log(chalk.yellow('Please install deno first:'));
-        console.log(chalk.gray('https://deno.land/#installation\n'));
-        process.exit(1);
-      }
       // For Deno, create deno.json if it doesn't exist
       if (!existsSync('deno.json')) {
         console.log(chalk.yellow('\nInitializing new Deno project...'));
@@ -325,14 +304,6 @@ async function main() {
       console.log(chalk.gray('{\n  "deno.unstable": ["sloppy-imports"]\n}'));
     }
   } else if (language === 'Ruby') {
-    try {
-      await runCommand('bundle', ['--version'], 'Checking bundler installation');
-    } catch (error) {
-      console.log(chalk.red('\nError: bundler is not installed or not available in PATH'));
-      console.log(chalk.yellow('Please install bundler first:'));
-      console.log(chalk.gray('https://bundler.io/#getting-started\n'));
-      process.exit(1);
-    }
     // Initialize Gemfile if it doesn't exist
     if (!existsSync('Gemfile')) {
       console.log(chalk.yellow('\nInitializing new Ruby project...'));

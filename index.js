@@ -18,13 +18,17 @@ function showHelp() {
   console.log('  npx create-baml-app my-baml-app');
   console.log('  npx create-baml-app my-baml-app --use-current-dir');
   console.log('  npx create-baml-app my-baml-app -.');
+  console.log('\nSupported Package Managers:');
+  console.log('  - Python: pip, poetry, uv');
+  console.log('  - TypeScript: npm, pnpm, yarn, deno, bun');
+  console.log('  - Ruby: bundle');
   process.exit(0);
 }
 
-async function runCommand(command, args, description) {
+async function runCommand(command, args, description, options = {}) {
   console.log(chalk.cyan(`\nRunning: ${description}...`));
   try {
-    const { stdout } = await execa(command, args, { stdio: 'inherit' });
+    const { stdout } = await execa(command, args, { stdio: 'inherit', ...options });
     console.log(chalk.green('✓ Success!'));
     return stdout;
   } catch (error) {
@@ -102,7 +106,7 @@ async function main() {
       packageManagerChoices = ['pip', 'poetry', 'uv'];
       break;
     case 'TypeScript':
-      packageManagerChoices = ['npm', 'pnpm', 'yarn', 'deno'];
+      packageManagerChoices = ['npm', 'pnpm', 'yarn', 'deno', 'bun'];
       break;
     case 'Ruby':
       packageManagerChoices = ['bundle'];
@@ -155,6 +159,9 @@ async function main() {
         break;
       case 'bundle':
         installLink = 'https://bundler.io/#getting-started';
+        break;
+      case 'bun':
+        installLink = 'https://bun.sh/docs/installation';
         break;
     }
     
@@ -228,7 +235,7 @@ async function main() {
     }
   } else if (language === 'TypeScript') {
     // Install TypeScript first based on package manager (except for Deno)
-    if (packageManager !== 'deno') {
+    if (packageManager !== 'deno' && packageManager !== 'bun') {
       switch (packageManager) {
         case 'npm':
           await runCommand('npm', ['install', 'typescript', '--save-dev'], 'Installing TypeScript');
@@ -240,6 +247,8 @@ async function main() {
           await runCommand('yarn', ['add', 'typescript', '--dev'], 'Installing TypeScript');
           break;
       }
+    } else if (packageManager === 'bun') {
+      await runCommand('bun', ['add', 'typescript', '--dev'], 'Installing TypeScript');
     }
 
     // Create tsconfig.json if it doesn't exist
@@ -254,6 +263,9 @@ async function main() {
             break;
           case 'yarn':
             await runCommand('yarn', ['tsc', '--init'], 'Creating tsconfig.json');
+            break;
+          case 'bun':
+            await runCommand('bun', ['x', 'tsc', '--init'], 'Creating tsconfig.json');
             break;
           case 'deno':
             // For Deno, we'll create a basic tsconfig.json directly
@@ -302,6 +314,15 @@ async function main() {
       await runCommand('deno', ['run', '--unstable-sloppy-imports', '-A', 'npm:@boundaryml/baml/baml-cli', 'generate'], 'Generating BAML files');
       console.log(chalk.yellow('\nNote: As per BAML docs, for Deno in VSCode, add this to your config:'));
       console.log(chalk.gray('{\n  "deno.unstable": ["sloppy-imports"]\n}'));
+    } else if (packageManager === 'bun') {
+      // For Bun, create package.json if it doesn't exist
+      if (!existsSync('package.json')) {
+        console.log(chalk.yellow('\nInitializing new Bun project...'));
+        await runCommand('bun', ['init', '-y'], 'Creating package.json', { cwd: targetDir });
+      }
+      await runCommand('bun', ['install', '@boundaryml/baml'], 'Installing @boundaryml/baml', { cwd: targetDir });
+      await runCommand('bun', ['x', 'baml-cli', 'init'], 'Initializing BAML', { cwd: targetDir });
+      await runCommand('bun', ['x', 'baml-cli', 'generate'], 'Generating BAML files', { cwd: targetDir });
     }
   } else if (language === 'Ruby') {
     // Initialize Gemfile if it doesn't exist
